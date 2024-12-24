@@ -1,0 +1,289 @@
+##项目名
+```{r}
+Project_name<-"Micro_PVM1202"
+
+```
+
+
+```{r 初始化}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(readr)
+library(cols4all)
+library(ggplot2)
+library(harmony)
+library(openxlsx)
+dir.create("plot")
+dir.create("Documents")
+```
+##subset
+```{r}
+# Seurat.object<-subset(Seurat.object,subset = class=="Micro_PVMs")
+
+Seurat.object<-readRDS(paste0(Project_name,".rds"))
+Seurat.object.2<-readRDS(paste0(Project_name,"_part.rds"))
+```
+
+```{r}
+Seurat.object<-subset(Seurat.object,subset = subclass !="Microglia-Homeostatic2")
+```
+
+
+##Seurat Workflow
+```{r warning=TRUE}
+reduction_name<-"harmony"
+
+2# 数据归一化----
+Seurat.object <- NormalizeData(Seurat.object, normalization.method = "LogNormalize", scale.factor = 10000)
+
+3# 识别高变特征（特征选择）----
+Seurat.object <- FindVariableFeatures(Seurat.object, selection.method = "vst", nfeatures = 3000)
+
+4# 标准化数据------
+Seurat.object <- ScaleData(Seurat.object)
+
+# Seurat.object<-SCTransform(Seurat.object,vars.to.regress = "percent.mt")
+
+5# 线性降维----
+Seurat.object <- RunPCA(Seurat.object, features = VariableFeatures(object = Seurat.object))
+Seurat.object <- RunHarmony(Seurat.object,group.by.vars="orig.ident", reduction.use = "pca")
+
+
+6# 确定数据集的维度------
+Cairo::CairoPNG(filename = "plot/heatmap.png",width = 3000,height = 3000,dpi = 200)
+DimHeatmap(Seurat.object, dims = 1:40, cells = 500, balanced = TRUE,ncol = 5,reduction = reduction_name)
+# ggsave(Heatmap_PCA,"plot/vlnplot_mt.png",plot = Vln_mt,device = "png",width=3000,height = 2000,dpi = 200,units = "px")
+dev.off()
+```
+
+###选择用来分群的reduction
+```{r}
+8 #8 细胞聚类/分群-------
+Seurat.object <- FindNeighbors(Seurat.object, dims = 1:15,reduction = reduction_name)
+Seurat.object <- FindClusters(Seurat.object, resolution = seq(0.5,1,0.5))
+
+##UMAP
+Seurat.object <- RunUMAP(Seurat.object, dims = 1:30,reduction = reduction_name)
+# Seurat.object <- RunTSNE(Seurat.object, dims = 1:18,check_duplicates = FALSE)
+```
+###看一下UMAP
+```{r QC,analysis}
+# Cairo::CairoPNG(filename = "UMAP_ALL.png",width = 2400,height = 1200,dpi = 100)
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.1
+UMAP_all<-DimPlot(Seurat.object, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = "plot/UMAP_re1.png",plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.0.5
+UMAP_all<-DimPlot(Seurat.object, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = "plot/UMAP_re0.5.png",plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.0.5
+UMAP_all<-DimPlot(Seurat.object, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = "plot/UMAP_re0.5_group.png",plot = UMAP_all,device = "png",width=4500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+#看下样本整合情况
+Seurat.object@active.ident<-Seurat.object$orig.ident
+UMAP_sample<-DimPlot(Seurat.object, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        
+        ,label.size = 1)
+ggsave(filename = "plot/UMAP_sample.png",plot = UMAP_sample,device = "png",width=2500,height = 2000,dpi = 200,units = "px")
+```
+##导出信息
+```{r}
+Idents(Seurat.object)<-"RNA_snn_res.1"
+cellnumber<-data.frame(cluster=levels(Seurat.object@active.ident)) %>% arrange %>%
+  mutate(class="",subclass="",subcluster="")
+
+write.xlsx(cellnumber, file = paste0("Documents/",Project_name,"_cellnumber.xlsx"))
+write_csv(cellnumber,paste0("Documents/",Project_name,"_cellnumber.csv"))
+```
+
+###导出Marker及分群信息
+```{r QC,analysis}
+11# 使用自定Marker进行手动注释----
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.0.5
+Seurat.object.Markers<-FindAllMarkers(Seurat.object,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+Seurat.object.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0("Documents/",Project_name,"_re0.5_Top30.xlsx"))
+write.xlsx(Seurat.object.Markers, file = paste0("Documents/",Project_name,"_re0.5.xlsx"))
+# write.csv(top30,paste0("Documents/",Project_name,"_re0.5_Top30.csv"))
+# write.csv(Seurat.object.Markers,paste0("Documents/",Project_name,"_re0.5.csv"))
+
+```
+###导出Marker及分群信息
+```{r QC,analysis}
+11# 使用自定Marker进行手动注释----
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.1
+Seurat.object.Markers<-FindAllMarkers(Seurat.object,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+Seurat.object.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0("Documents/",Project_name,"_re1_Top30.xlsx"))
+write.xlsx(Seurat.object.Markers, file = paste0("Documents/",Project_name,"_re1.xlsx"))
+# write.csv(top30,"Documents/Seurat.object_re1_Top30.csv")
+# write.csv(Seurat.object.Markers,"Documents/Seurat.object_re1_markers.csv")
+```
+
+###导出Marker及分群信息
+```{r QC,analysis}
+11# 使用自定Marker进行手动注释----
+varuse<-"subclass"
+Idents(Seurat.object)<-varuse
+Seurat.object.Markers<-FindAllMarkers(Seurat.object,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+Seurat.object.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0("Documents/",Project_name,varuse,"_Top30.xlsx"))
+write.xlsx(Seurat.object.Markers, file = paste0("Documents/",Project_name,varuse,".xlsx"))
+# write.csv(top30,"Documents/Seurat.object_re1_Top30.csv")
+# write.csv(Seurat.object.Markers,"Documents/Seurat.object_re1_markers.csv")
+```
+###改名
+####class
+```{r QC,analysis}
+cellnumber<- read.xlsx(paste0("Documents/",Project_name,"_cellnumber.xlsx"))
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.0.5
+
+cluster <- cellnumber$cluster
+class <- cellnumber$class
+names(class) <- cluster
+Seurat.object <- RenameIdents(Seurat.object, class)
+
+Seurat.object$class<-Seurat.object@active.ident
+```
+####subclass
+```{r QC,analysis}
+cellnumber<- read.xlsx(paste0("Documents/",Project_name,"_cellnumber.xlsx"))
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.1
+
+cluster <- cellnumber$cluster
+subclass <- cellnumber$subclass
+names(subclass) <- cluster
+Seurat.object <- RenameIdents(Seurat.object, subclass)
+
+Seurat.object$subclass<-Seurat.object@active.ident
+```
+
+##mt
+```{r}
+Vln_mt<-VlnPlot(Seurat.object, features = c("nFeature_RNA", "percent.ribo", "percent.mt"), layer = 'counts',ncol = 3)
+ggsave(filename = "plot/vlnplot_mt.pdf",plot = Vln_mt,device = "pdf",dpi = 400)
+ggsave(filename = "plot/vlnplot_mt.png",plot = Vln_mt,device = "png",width=3000,height = 2000,dpi = 200,units = "px")
+
+# MT.data<-FetchData(Seurat.object,vars = c(""))
+```
+
+##画图
+###UMAP
+```{r plot}
+# umap
+Seurat.object@active.ident<-Seurat.object$class
+UMAP_class<-DimPlot(Seurat.object, reduction = "umap",label = TRUE
+        ,cols=mycol1
+        # ,split.by  = 'Group'
+        ,label.size = 5)
+ggsave(filename = "plot/UMAP_class1.png",plot = UMAP_class,device = "png",width=2500,height = 2000,dpi = 200,units = "px")
+```
+###UMAP
+```{r plot}
+# umap
+Seurat.object@active.ident<-Seurat.object$subclass
+UMAP_class<-DimPlot(Seurat.object, reduction = "umap",label = FALSE
+        ,cols=mycol1
+        ,pt.size = 2
+        ,split.by  = 'Group'
+        ,label.size = 10)
+ggsave(filename = "plot/UMAP_subclass.png",plot = UMAP_class,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+###cellratio
+```{r plot}
+mycol3<-c4a('brewer.accent',7)
+cell_number<-(prop.table(table(Seurat.object@active.ident,Seurat.object$Group),margin = 2)*100)%>%
+  round(digits = 2)
+cell_number<-as.data.frame(cell_number)
+colnames(cell_number)<-c('celltype','Group','percentage')
+
+# cell_number<-cell_number %>%
+#   filter(orig.ident %in% c("a53t12","a53t4","wt12c","DY6")) %>%
+#   filter(celltype  !="Shallow")
+
+p <- ggplot(cell_number, aes(x = celltype, #给一个数值向量作为柱子x轴的中心坐标
+                            y = percentage,
+                            fill = Group  )) + #将颜色映射到celltype
+  geom_bar(position = "dodge", stat="identity", color = NA, width = 0.8)
+# geom_col(width = 1.5, #柱形图柱子宽度
+#          color = 'white') 
+p
+
+p1<-p+scale_fill_manual(values = mycol4) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_classic()
+p1
+
+ggsave(filename =paste0("plot/",Project_name,"_Cellratio_class.png"),plot = p1,device = "png",width=4500,height = 2500,dpi = 200,units = "px" )
+ggsave(filename =paste0("plot/",Project_name,"_Cellratio_class.pdf"),plot = p1,device = "pdf",width=4500,height = 2500,dpi = 200,units = "px" )
+```
+
+###设置Marker
+```{r}
+Markers_all<-c(
+  'RALYL','LDB2','NELL2'
+  #Glutamatergic Neuron	
+  ,'GAD1','GRIP1','GAD2','SLC6A1'
+  #GABAergic Neuron	
+  ,'PDGFRA','VCAN','OLIG1'
+  # OPC
+  ,'MBP','MOBP','MOG',"OPALIN"
+  # OLIGO
+  ,'AQP4','GFAP','FGFR3',"NHSL1","SLC25A18"
+  # ASTRO
+  ,  'CD2','THEMIS','CD3D'
+   # T CELL
+  ,'ITGAM','CD74','CX3CR1','P2RY12',"C3","CSF1R","MRC1","CD163"
+  # MICRO 
+  ,'DCN','FLT1',"LEF1","VWF"
+  # VC
+)
+```
+###Dotplot
+```{r}
+Seurat.object@active.ident<-Seurat.object$RNA_snn_res.0.5
+Dotplot_re0.5<-DotPlot(Seurat.object,features = Markers_all,dot.scale = 20
+        # ,idents=c("Glutamatergic Neurons","GABAergic Neurons","Astrocytes","Micro-PVM","Oligos","OPCs","Endo-Pericytes","Tcells")
+        ,cluster.idents = TRUE
+        )+
+  coord_flip()+
+  scale_colour_binned_c4a_div('kovesi.div_bu_wh_rd2')
+ggsave(filename ="plot/Dotplot_re0.5.png",plot = Dotplot_re0.5,device = "png",width=2500,height = 4500,dpi = 100,units = "px" )
+ggsave(filename ="plot/Dotplot_re0.5.pdf",plot = Dotplot_re0.5,device = "pdf",width=2500,height = 4500,dpi = 100,units = "px" )
+```
+
+##保存数据
+```{r}
+saveRDS(Seurat.object,paste0(Project_name,".rds"))
+saveRDS(Seurat.object,paste0(Project_name,"_part.rds"))
+```
+
+##输出loupe
+```{r}
+library(loupeR)
+create_loupe_from_seurat(Seurat.object,output_name = Project_name,force = TRUE)
+```

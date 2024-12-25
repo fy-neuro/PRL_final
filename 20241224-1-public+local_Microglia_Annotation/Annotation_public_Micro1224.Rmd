@@ -1,0 +1,192 @@
+##Project_name
+```{r}
+Project_name<-"Micro_public1224"
+plot_out_path<-paste0(Project_name,"_plot/")
+document_out_path<-paste0(Project_name,"_document/")
+```
+
+```{r 初始化}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(readr)
+library(cols4all)
+library(ggplot2)
+library(harmony)
+library(openxlsx)
+dir.create(plot_out_path)
+dir.create(document_out_path)
+```
+##load Data
+```{r}
+sobj <- readRDS("STM_Micro1221.rds")
+sobj
+```
+##Workflow
+```{r}
+reduction_name<-"harmony"
+
+2# 数据归一化----
+sobj <- NormalizeData(sobj, normalization.method = "LogNormalize", scale.factor = 10000)
+
+3# 识别高变特征（特征选择）----
+sobj <- FindVariableFeatures(sobj, selection.method = "vst", nfeatures = 3000)
+
+4# 标准化数据------
+sobj <- ScaleData(sobj)
+
+# sobj<-SCTransform(sobj,vars.to.regress = "percent.mt")
+
+5# 线性降维----
+sobj <- RunPCA(sobj, features = VariableFeatures(object = sobj))
+sobj <- RunHarmony(sobj,group.by.vars="orig.ident", reduction.use = "pca")
+
+
+6# 确定数据集的维度------
+Cairo::CairoPNG(filename = paste0(plot_out_path,reduction_name,"_heatmap.png"),width = 3000,height = 3000,dpi = 200)
+DimHeatmap(sobj, dims = 1:40, cells = 500, balanced = TRUE,ncol = 5,reduction = reduction_name)
+# ggsave(Heatmap_PCA,"plot/vlnplot_mt.png",plot = Vln_mt,device = "png",width=3000,height = 2000,dpi = 200,units = "px")
+dev.off()
+```
+
+###select reduction
+```{r}
+8 #8 细胞聚类/分群-------
+sobj <- FindNeighbors(sobj, dims = 1:15,reduction = reduction_name)
+sobj <- FindClusters(sobj, resolution = seq(0.5,1,0.5))
+
+##UMAP
+sobj <- RunUMAP(sobj, dims = 1:15,reduction = reduction_name)
+# sobj <- RunTSNE(sobj, dims = 1:18,check_duplicates = FALSE)
+```
+###UMAP
+```{r QC,analysis}
+
+varuse<-"RNA_snn_res.1"
+reduction_use<-"umap"
+Idents(sobj)<-varuse
+UMAP_all<-DimPlot(sobj, reduction = reduction_use,label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+
+varuse<-"RNA_snn_res.0.5"
+Idents(sobj)<-varuse
+
+UMAP_all<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+#看下样本整合情况
+varuse<-"orig.ident"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_sample,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+
+varuse<-"orig.ident"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'orig.ident'
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_group.png"),plot = UMAP_sample,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+
+##Export Marker list
+```{r}
+Idents(sobj)<-"RNA_snn_res.1"
+sobj.Markers<-FindAllMarkers(sobj,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0(document_out_path,Project_name,"_re1_Top30.xlsx"))
+write.xlsx(sobj.Markers, file = paste0(document_out_path,Project_name,"_re1.xlsx"))
+
+```
+
+##Rename
+###export excel
+```{r}
+Idents(sobj)<-"RNA_snn_res.1"
+cellnumber<-data.frame(cluster=levels(Idents(sobj))) %>% arrange %>%
+  mutate(class="",subclass="",subcluster="")
+
+write.xlsx(cellnumber, file = paste0(document_out_path,Project_name,"_cellnumber.xlsx"))
+```
+###rename subclass
+```{r}
+
+Idents(sobj)<-"RNA_snn_res.1"
+cellnumber<- read.xlsx(paste0(document_out_path,Project_name,"_cellnumber.xlsx"))
+
+cluster <- cellnumber$cluster
+subclass <- cellnumber$subclass
+names(subclass) <- cluster
+sobj <- RenameIdents(sobj, subclass)
+
+sobj$subclass<-sobj@active.ident
+```
+###UMAP check
+```{r}
+varuse<-"subclass"
+reduction_use<-"umap"
+Idents(sobj)<-varuse
+UMAP_all<-DimPlot(sobj, reduction = reduction_use,label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+```
+
+```{r}
+library(Scillus)
+cluster_name<-"0"
+title<-paste0("cluster",cluster_name,"GO enrichment")
+p <- plot_cluster_go(sobj.Markers, cluster_name = cluster_name, org = "human", topn = 100,ont = "ALL")+ggtitle(title)
+ggsave(filename =paste0(plot_out_path,Project_name,"cluster",cluster_name,"_GO_enrichment.png"),device = "png",width=4000,height = 2500,dpi = 400,units = "px" )
+```
+##Markerplot
+###Heatmap
+```{r}
+varuse<-"subclass"
+Idents(sobj)<-varuse
+Idents(sobj)<-factor(Idents(sobj),levels = c("Microglia","Activated","BAM"))
+sobj.Markers<-FindAllMarkers(sobj,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 10, wt = avg_log2FC) -> top10
+```
+
+```{r}
+mycol<-c("#66C5CC" ,"#F6CF71" ,"#F89C74" ,"#DCB0F2" ,"#87C55F", "#9EB9F3" ,"#FE88B1")
+sobj.scale<-ScaleData(subset(sobj,downsample=200),features=top30$gene)
+Heatmap<-DoHeatmap(sobj.scale
+                   ,features = top10$gene
+                   ,group.colors = mycol
+                   ) + 
+  scale_fill_gradientn(colors = c("white","grey","firebrick3"))+
+  NoLegend()
+ggsave(filename =  paste0(plot_out_path,Project_name,"_Heatmap",".png"),device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+```
+
+##savedata
+```{r}
+saveRDS(sobj,paste0(Project_name,".rds"))
+```
+##loupe
+```{r}
+library(loupeR)
+create_loupe_from_seurat(sobj,output_name = Project_name,force = TRUE)
+```

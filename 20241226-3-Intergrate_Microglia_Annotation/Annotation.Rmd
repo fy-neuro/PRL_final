@@ -107,10 +107,11 @@ UMAP_sample<-DimPlot(sobj, reduction = "umap",label = FALSE
         ,split.by  = 'subgroup'
         ,ncol = 2
         ,label.size = 1
-        ,pt.size = 2
+        ,pt.size = 1
         )
-ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_subgroup.png"),plot = UMAP_sample,device = "png",width=4000,height = 4000,dpi = 300,units = "px")
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_subgroup.png"),plot = UMAP_sample,device = "png",width=5000,height = 4000,dpi = 400,units = "px")
 ```
+
 ##保存rds
 
 ```{r}

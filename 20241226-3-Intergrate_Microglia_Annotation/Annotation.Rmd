@@ -1,0 +1,123 @@
+##Project_name
+```{r}
+Project_name<-"Micro_Intergrate1_Annotation226"
+plot_out_path<-paste0(Project_name,"_plot/")
+document_out_path<-paste0(Project_name,"_document/")
+```
+
+```{r 初始化}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(readr)
+library(cols4all)
+library(ggplot2)
+library(harmony)
+library(openxlsx)
+dir.create(plot_out_path)
+dir.create(document_out_path)
+```
+##load data
+```{r}
+sobj<-readRDS("../20241225-2-Microglia_intergrate/Micro_Intergrate1225.rds")
+```
+##modify some variables
+
+```{r}
+Meta.X<-sobj@meta.data
+Meta.X<-Meta.X %>%
+  mutate_if(is.factor,as.character)%>%
+  mutate(source=ifelse(Sex=="NA","postmoterm","biopsy"))%>%
+  mutate(Group=ifelse(Group=="Parkinson's Disease","PD",Group)) %>%
+  mutate_if(is.character,as.factor)
+```
+
+```{r}
+sobj@meta.data<-Meta.X
+```
+
+
+```{r}
+sobj$subgroup<-paste0(sobj$Group,"_",sobj$source)
+sobj$subgroup<-sobj$subgroup %>%as.factor
+```
+
+
+###Export Marker list
+```{r}
+Idents(sobj)<-"RNA_snn_res.1"
+sobj.Markers<-FindAllMarkers(sobj,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0(document_out_path,Project_name,"_re1_Top30.xlsx"))
+write.xlsx(sobj.Markers, file = paste0(document_out_path,Project_name,"_re1.xlsx"))
+
+```
+
+```{r}
+Idents(sobj)<-"RNA_snn_res.1"
+cellnumber<-data.frame(cluster=levels(Idents(sobj))) %>% arrange %>%
+  mutate(class="",subclass="",subcluster="")
+
+write.xlsx(cellnumber, file = paste0(document_out_path,Project_name,"_cellnumber.xlsx"))
+```
+
+```{r}
+
+Idents(sobj)<-"RNA_snn_res.1"
+cellnumber<- read.xlsx(paste0(document_out_path,Project_name,"_cellnumber.xlsx"))
+
+cluster <- cellnumber$cluster
+subclass <- cellnumber$subclass
+names(subclass) <- cluster
+sobj <- RenameIdents(sobj, subclass)
+
+sobj$subclass<-sobj@active.ident
+```
+##UMAP
+```{r}
+varuse<-"subclass"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'Group'
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_group.png"),plot = UMAP_sample,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+```{r}
+varuse<-"subclass"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'source'
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_source.png"),plot = UMAP_sample,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+```{r}
+mycol1<-c(  "#FB9A99" ,"#E31A1C", "#FDBF6F","#A6CEE3" ,"#1F78B4", "#B2DF8A" ,"#33A02C" ,"#FF7F00" ,
+           "#CAB2D6", "#6A3D9A", "#FFFF99","#B15928")
+# levels(sobj$subclass)
+varuse<-"subclass"
+Idents(sobj)<-varuse
+# sobj$subgroup<-sobj$subgroup %>%factor(levels = c("PD_postmoterm","PD_biopsy","Control_postmoterm","Control_biopsy"))
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = FALSE
+        ,cols=mycol1
+        ,split.by  = 'subgroup'
+        ,ncol = 2
+        ,label.size = 1
+        ,pt.size = 2
+        )
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_subgroup.png"),plot = UMAP_sample,device = "png",width=4000,height = 4000,dpi = 300,units = "px")
+```
+##保存rds
+
+```{r}
+saveRDS(sobj,paste0(Project_name,".rds"))
+```
+##loupe
+```{r}
+library(loupeR)
+create_loupe_from_seurat(sobj,output_name = Project_name,force = TRUE)
+```

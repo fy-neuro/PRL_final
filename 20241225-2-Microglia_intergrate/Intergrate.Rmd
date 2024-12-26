@@ -1,0 +1,116 @@
+##Project_name
+```{r}
+Project_name<-"Micro_Intergrate1225"
+plot_out_path<-paste0(Project_name,"_plot/")
+document_out_path<-paste0(Project_name,"_document/")
+```
+
+```{r 初始化}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(readr)
+library(cols4all)
+library(ggplot2)
+library(harmony)
+library(openxlsx)
+dir.create(plot_out_path)
+dir.create(document_out_path)
+```
+
+```{r}
+ sobj <- readRDS("E:/PRL_final/20241224-1-public+local_Microglia_Annotation/Mciro_Intergrate1223.rds")
+```
+##Harmony Intergration
+```{r}
+##Harmony Intergration
+
+
+library(Seurat)
+# library(SeuratData)
+library(SeuratWrappers)
+library(patchwork)
+library(tidyverse)
+library(loupeR)
+
+reduction_name<-"harmony"
+
+2# 数据归一化----
+sobj <- NormalizeData(sobj, normalization.method = "LogNormalize", scale.factor = 10000)
+
+3# 识别高变特征（特征选择）----
+sobj <- FindVariableFeatures(sobj)
+
+4# 标准化数据------
+sobj <- ScaleData(sobj)
+
+# sobj<-SCTransform(sobj,vars.to.regress = "percent.mt")
+
+5# 线性降维----
+sobj <- RunPCA(sobj, features = VariableFeatures(object = sobj))
+sobj <- RunHarmony(sobj,group.by.vars="orig.ident", reduction.use = "pca")
+
+Cairo::CairoPNG(filename = paste0(plot_out_path,reduction_name,"_heatmap.png"),width = 3000,height = 3000,dpi = 200)
+DimHeatmap(sobj, dims = 1:40, cells = 500, balanced = TRUE,ncol = 5,reduction = reduction_name)
+# ggsave(Heatmap_PCA,"plot/vlnplot_mt.png",plot = Vln_mt,device = "png",width=3000,height = 2000,dpi = 200,units = "px")
+dev.off()
+
+# Further analysis steps
+sobj <- FindNeighbors(sobj, reduction = reduction_name, dims = 1:25)
+sobj <- FindClusters(sobj, resolution = seq(0.1, 0.5, 0.1))
+sobj <- RunUMAP(sobj, dims = 1:20, reduction = reduction_name)
+
+
+```
+
+###UMAP
+```{r QC,analysis}
+
+varuse<-"RNA_snn_res.1"
+reduction_use<-"umap"
+Idents(sobj)<-varuse
+UMAP_all<-DimPlot(sobj, reduction = reduction_use,label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+
+varuse<-"RNA_snn_res.0.5"
+Idents(sobj)<-varuse
+
+UMAP_all<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        ,label.size = 3)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_all,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+# dev.off()
+#看下样本整合情况
+varuse<-"orig.ident"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        # ,split.by  = 'Group'
+        
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,".png"),plot = UMAP_sample,device = "png",width=2500,height = 2000,dpi = 300,units = "px")
+
+varuse<-"RNA_snn_res.1"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'Group'
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_group.png"),plot = UMAP_sample,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+
+##保存rds
+
+```{r}
+saveRDS(sobj,paste0(Project_name,".rds"))
+```
+##loupe
+```{r}
+library(loupeR)
+create_loupe_from_seurat(sobj,output_name = Project_name,force = TRUE)
+```

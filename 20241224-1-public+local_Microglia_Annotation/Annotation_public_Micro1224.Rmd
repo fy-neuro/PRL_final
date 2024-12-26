@@ -181,6 +181,41 @@ Heatmap<-DoHeatmap(sobj.scale
 ggsave(filename =  paste0(plot_out_path,Project_name,"_Heatmap",".png"),device = "png",width=2500,height = 2000,dpi = 300,units = "px")
 ```
 
+```{r}
+Markers_all<-c(
+  'RALYL','LDB2','NELL2'
+  #Glutamatergic Neuron	
+  ,'GAD1','GRIP1','GAD2','SLC6A1'
+  #GABAergic Neuron	
+  ,'PDGFRA','VCAN','OLIG1'
+  # OPC
+  ,'MBP','MOBP','MOG',"OPALIN"
+  # OLIGO
+  ,'AQP4','GFAP','FGFR3',"NHSL1","SLC25A18"
+  # ASTRO
+  ,  'CD2','THEMIS','CD3D'
+   # T CELL
+  ,'ITGAM','CD74','CX3CR1','P2RY12',"C3","CSF1R","MRC1","CD163"
+  # MICRO 
+  ,'DCN','FLT1',"LEF1","VWF"
+  # VC
+)
+```
+
+###Dotplot
+```{r}
+varuse<-"RNA_snn_res.1"
+Idents(sobj)<-varuse
+Dotplot_re0.5<-DotPlot(sobj,features = Markers_all,dot.scale = 20
+        # ,idents=c("Glutamatergic Neurons","GABAergic Neurons","Astrocytes","Micro-PVM","Oligos","OPCs","Endo-Pericytes","Tcells")
+        ,cluster.idents = TRUE
+        )+
+  coord_flip()+
+  scale_colour_binned_c4a_div('kovesi.div_bu_wh_rd2')
+ggsave(filename =paste0(plot_out_path,"Dotplot_",varuse,".png"),plot = Dotplot_re0.5,device = "png",width=2500,height = 4500,dpi = 100,units = "px" )
+ggsave(filename =paste0(plot_out_path,"Dotplot_",varuse,".pdf"),plot = Dotplot_re0.5,device = "pdf",width=2500,height = 4500,dpi = 100,units = "px" )
+```
+
 ##savedata
 ```{r}
 saveRDS(sobj,paste0(Project_name,".rds"))

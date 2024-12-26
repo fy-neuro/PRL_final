@@ -5,7 +5,7 @@ plot_out_path<-paste0(Project_name,"_plot/")
 document_out_path<-paste0(Project_name,"_document/")
 ```
 
-```{r 初始化}
+```{r}
 library(dplyr)
 library(Seurat)
 library(patchwork)
@@ -63,7 +63,7 @@ cellnumber<-data.frame(cluster=levels(Idents(sobj))) %>% arrange %>%
 
 write.xlsx(cellnumber, file = paste0(document_out_path,Project_name,"_cellnumber.xlsx"))
 ```
-
+##Rename subclass
 ```{r}
 
 Idents(sobj)<-"RNA_snn_res.1"

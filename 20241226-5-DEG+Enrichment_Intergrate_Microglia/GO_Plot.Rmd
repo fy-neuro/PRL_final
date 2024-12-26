@@ -1,0 +1,92 @@
+```{r}
+#相关R包载入：
+library(ggplot2)
+library(cols4all)
+
+#本地测试数据载入：
+##仅供绘图测试，无实际生物学意义
+dt <- read.xlsx("E:/PRL_final/20241226-5-DEG+Enrichment_Intergrate_Microglia/Micro_Intergrate_DEG1226_document/Micro_Intergrate_DEG1226subclassGO - 副本.xlsx")
+View(dt)
+```
+
+```{r}
+#将GO terms description转换为因子，指定绘图顺序：
+
+dt<-dt %>%
+  distinct(Description,.keep_all = TRUE)
+
+dt$Description <- factor(dt$Description,levels= rev(dt$Description))
+```
+
+
+```{r}
+df_plot<-dt %>%
+  group_by(cluster)%>%
+  top_n(n=5,wt=zScore)
+#基础富集条形图绘制：
+p <- ggplot() +
+  geom_bar(data = df_plot,
+           aes(x = -log10(pvalue), y = Description, fill = cluster),
+           width = 0.5, #柱子宽度调整
+           stat = 'identity') +
+  theme_classic()
+p
+```
+
+```{r}
+#调整x轴原点与y轴相切：
+p1 <- p + scale_x_continuous(expand = c(0,0))
+p1
+```
+```{r}
+#将GO terms标签叠加到柱子上：
+p2 <- p1 +
+  theme(axis.text.y = element_blank()) + #去掉y轴标签
+  geom_text(data = df_plot,
+            aes(x = 0.1, #用数值向量控制文本标签起始位置
+                y = Description,
+                label = Description),
+            size = 3,
+            hjust = 0) #左对齐
+p2
+```
+
+```{r}
+# #将Marker基因信息添加到GO terms标签信息下：
+# p3 <- p2 +
+#   geom_text(data = df_plot,
+#             aes(x = 0.1, y = Description, label = geneID, color = cluster),
+#             size = 1.5,
+#             fontface = 'italic', #geneID斜体
+#             hjust = 0,
+#             vjust = 2.3) #垂直偏移，调整文本向下
+# p3
+
+```
+
+```{r}
+#主标题和X/Y轴标题修改：
+p4 <- p2 +
+  labs(x = '-Log10P',
+       # y = 'Microglia3 Microglia2', #用空格控制间隙，多次调整直至合适
+       title = 'Enriched pathways of marker genes')
+p4
+
+```
+
+```{r}
+mycol1<-c( "#FB9A99" ,"#E31A1C", "#B2DF8A", "#A6CEE3" ,"#1F78B4", "#FDBF6F" ,"#33A02C" ,"#FF7F00" ,
+           "#CAB2D6", "#6A3D9A", "#FFFF99","#B15928")
+
+p5<-p4 + scale_fill_manual(values = alpha(mycol1, 0.8)) +
+  scale_color_manual(values = mycol1)
+ggsave(filename = paste0(plot_out_path,Project_name,"_GO_enrichment.png"),device = "png",width=4000,height = 2500,dpi = 400,units = "px" )
+```
+
+##Siluus
+```{r}
+library(Scillus)
+p <- plot_cluster_go(sobj.Markers, cluster_name = "Activated-CD83-CCL4", org = "human", topn = 100,ont = "ALL")+ggtitle(" GO enrichment")
+ggsave(filename =paste0(plot_out_path,Project_name,"_GO_enrichment.png"),device = "png",width=4000,height = 2500,dpi = 400,units = "px" )
+```
+

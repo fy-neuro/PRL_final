@@ -1,0 +1,35 @@
+##load data
+```{r}
+sobj<-readRDS("E:/PRL_final/20241226-3-Intergrate_Microglia_Annotation/Micro_Intergrate1_Annotation226.rds")
+```
+
+##cellratio
+```{r plot}
+mycol3<-c4a('brewer.accent',7)
+cell_number<-(prop.table(table(sobj$subclass,sobj$subgroup),margin = 2)*100)%>%
+  round(digits = 2)
+cell_number<-as.data.frame(cell_number)
+colnames(cell_number)<-c('celltype','Group','percentage')
+levels(cell_number$Group)
+cell_number$Group<-factor(cell_number$Group,levels =c("PD_postmoterm","Control_postmoterm","PD_biopsy","Control_biopsy") )
+# cell_number<-cell_number %>%
+#   filter(orig.ident %in% c("a53t12","a53t4","wt12c","DY6")) %>%
+#   filter(celltype  !="Shallow")
+
+p <- ggplot(cell_number, aes(x = Group, #给一个数值向量作为柱子x轴的中心坐标
+                            y = percentage,
+                            fill = celltype  )) + #将颜色映射到celltype
+  geom_bar(position = "stack", stat="identity", color = NA, width = 0.8)
+# geom_col(width = 1.5, #柱形图柱子宽度
+#          color = 'white') 
+p
+
+p1<-p+scale_fill_manual(values = mycol1) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_classic()+ # 这里使用条形图作为示例
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p1
+
+ggsave(filename =paste0(plot_out_path,Project_name,"_Cellratio_class.png"),plot = p1,device = "png",width=2500,height = 2500,dpi = 300,units = "px" )
+ggsave(filename =paste0(plot_out_path,Project_name,"_Cellratio_class.pdf"),plot = p1,device = "pdf",width=2500,height = 2500,dpi = 300,units = "px" )
+```

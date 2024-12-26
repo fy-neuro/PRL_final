@@ -1,0 +1,53 @@
+##Project_name
+```{r}
+Project_name<-"Micro_Intergrate_DEG1226"
+plot_out_path<-paste0(Project_name,"_plot/")
+document_out_path<-paste0(Project_name,"_document/")
+```
+
+
+```{r}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(readr)
+library(cols4all)
+library(ggplot2)
+library(harmony)
+library(openxlsx)
+dir.create(plot_out_path)
+dir.create(document_out_path)
+```
+##load data
+```{r}
+sobj<-readRDS("E:/PRL_final/20241226-3-Intergrate_Microglia_Annotation/Micro_Intergrate1_Annotation226.rds")
+```
+
+##findallmarkers
+```{r}
+Idents(sobj)<-"subclass"
+sobj.Markers<-FindAllMarkers(sobj,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0(document_out_path,Project_name,varuse,"_Top30.xlsx"))
+write.xlsx(sobj.Markers, file = paste0(document_out_path,Project_name,varuse,".xlsx"))
+
+```
+
+##RR vs HM
+```{r}
+Idents(sobj)<-"subclass"
+taskname<-"RR vs HM"
+sobj.Markers<-FindMarkers(sobj,ident.1 = "Rapid Response",ident.2 = "Homeostatic",only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+sobj.Markers %>%
+  # group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+
+write.xlsx(top30, file = paste0(document_out_path,Project_name,varuse,taskname,"_Top30.xlsx"),rowNames =TRUE)
+write.xlsx(sobj.Markers, file = paste0(document_out_path,Project_name,varuse,taskname,".xlsx"),rowNames =TRUE)
+```
+
+
+##Enrichment

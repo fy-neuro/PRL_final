@@ -1,0 +1,32 @@
+```{r}
+
+```
+
+
+```{r}
+##Heatmap
+
+varuse<-"subclass"
+Idents(sobj)<-varuse
+sobj.Markers<-FindAllMarkers(sobj,only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 30, wt = avg_log2FC) -> top30
+sobj.Markers %>%
+  group_by(cluster) %>%
+  top_n(n = 10, wt = avg_log2FC) -> top10
+```
+
+```{r}
+mycol1<-c(  "#A6CEE3" ,"#1F78B4", "#B2DF8A","#FB9A99" ,"#E31A1C", "#FDBF6F" ,"#33A02C" ,"#FF7F00" ,
+           "#CAB2D6", "#6A3D9A", "#FFFF99","#B15928")
+sobj.scale<-ScaleData(subset(sobj,downsample=200),features=top30$gene)
+Heatmap<-DoHeatmap(sobj.scale
+                   ,features = top10$gene
+                   ,group.colors = mycol1
+                   ) + 
+  scale_fill_gradientn(colors = c("white","grey","firebrick3"))
+ggsave(filename =  paste0(plot_out_path,Project_name,"_Heatmap",".png"),device = "png",width=4000,height = 3000,dpi = 200,units = "px")
+```
+
+

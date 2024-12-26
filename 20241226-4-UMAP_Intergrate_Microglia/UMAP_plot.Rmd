@@ -1,0 +1,61 @@
+##Project_name
+```{r}
+Project_name<-"Micro_Intergrate1226"
+plot_out_path<-paste0(Project_name,"_plot/")
+document_out_path<-paste0(Project_name,"_document/")
+```
+
+```{r}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(readr)
+library(cols4all)
+library(ggplot2)
+library(harmony)
+library(openxlsx)
+dir.create(plot_out_path)
+dir.create(document_out_path)
+```
+
+##load data
+```{r}
+sobj<-readRDS("E:/PRL_final/20241226-3-Intergrate_Microglia_Annotation/Micro_Intergrate1_Annotation226.rds")
+```
+
+##UMAP
+```{r}
+varuse<-"subclass"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'Group'
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_group.png"),plot = UMAP_sample,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+```{r}
+varuse<-"subclass"
+Idents(sobj)<-varuse
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = TRUE
+        # ,cols=mycol
+        ,split.by  = 'source'
+        ,label.size = 1)
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_source.png"),plot = UMAP_sample,device = "png",width=4000,height = 2000,dpi = 300,units = "px")
+```
+```{r}
+mycol1<-c(  "#A6CEE3" ,"#1F78B4", "#B2DF8A","#FB9A99" ,"#E31A1C", "#FDBF6F" ,"#33A02C" ,"#FF7F00" ,
+           "#CAB2D6", "#6A3D9A", "#FFFF99","#B15928")
+
+# levels(sobj$subclass)
+varuse<-"subclass"
+Idents(sobj)<-varuse
+# sobj$subgroup<-sobj$subgroup %>%factor(levels = c("PD_postmoterm","PD_biopsy","Control_postmoterm","Control_biopsy"))
+UMAP_sample<-DimPlot(sobj, reduction = "umap",label = FALSE
+        ,cols=mycol1
+        ,split.by  = 'subgroup'
+        ,ncol = 2
+        ,label.size = 1
+        ,pt.size = 1
+        )
+ggsave(filename = paste0(plot_out_path,Project_name,reduction_use,"_",varuse,"_subgroup.png"),plot = UMAP_sample,device = "png",width=5000,height = 4000,dpi = 400,units = "px")
+```

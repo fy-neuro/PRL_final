@@ -1,0 +1,61 @@
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(stats)
+library(data.table)
+library(dplyr)
+library(openxlsx)
+```
+
+
+```{r}
+varuse <- "subclass"
+all_markers <- read.xlsx(paste0(document_out_path,Project_name,varuse,".xlsx"))
+names(all_markers)
+all_markers<-all_markers %>%
+  group_by(cluster)%>%
+  top_n(n=100,wt=avg_log2FC)
+output_excel <- paste0(document_out_path,Project_name,varuse,"GO_100",".xlsx")
+
+# Loop through each unique cluster in the data
+unique_clusters <- unique(all_markers$cluster)
+
+wb <- createWorkbook()
+
+for (cluster_name in unique_clusters) {
+  DEG_data <- all_markers %>% filter(cluster == cluster_name)
+  
+  # Gene name to GeneID conversion
+  gene_df <- bitr(DEG_data$gene, fromType = "SYMBOL",
+                  toType = c("ENTREZID", "SYMBOL"),
+                  OrgDb = org.Hs.eg.db)
+  
+  colnames(gene_df)[1] <- "gene"
+  DEG_data <- left_join(gene_df, DEG_data)
+  
+  # GO enrichment
+  GO_all <- enrichGO(gene = DEG_data$ENTREZID,
+                     keyType = "ENTREZID",
+                     OrgDb = org.Hs.eg.db,
+                     ont = "ALL",
+                     pvalueCutoff = 0.01,
+                     pAdjustMethod = "fdr",
+                     minGSSize = 10,
+                     maxGSSize = 500,
+                     qvalueCutoff = 0.01,
+                     readable = TRUE)
+  
+  GO_result <- data.frame(GO_all)
+  
+  # Write GO_result to Excel
+  # write.xlsx(GO_result, paste0("../output/", celltype, "_GO_result.xlsx"))
+  addWorksheet(wb, cluster_name, zoom = 200)
+  writeData(wb, cluster_name, GO_result)
+  
+}
+
+saveWorkbook(wb, output_excel, overwrite = TRUE)
+```
+
